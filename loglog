@@ -5,25 +5,143 @@ use Time::localtime;
 use vars qw($VERSION);
 use IO::Socket;
 use Sys::Hostname;
+use Data::Dumper;
+use Getopt::Long;
 $|=1;
 # Note that Proc::Daemon, and File::Tail are included inline. 
+$host = `hostname -s`; chomp($host);
 
-# much of Net::Syslog has been copied. It's not used directly to allow logging with different programnames and to streamline dealing with long logs (re-coding send allows that routine to deal with long logs instead of needing the code in multiple places).
+GetOptions("debug:i" => \$debug, 
+    "file=s" => \$conf, 
+    "help" => \$help,
+    "maxloglength=i" => \$maxloglength,
+    "port=s" => \$SyslogPort,
+    "priorty=s" => \$priority,
+    "facility=s" => \$Facility,
+    "server=s" => \$SyslogHost);
 
-
+if (!$debug) {$debug = 0;}
+if (!$SyslogHost) {$SyslogHost = 'scribe';}
+if (!$Facility) {$Facility = 'local6';}
+if (!$priority) {$priority = 'info';}
+if (!$SyslogPort) {$SyslogPort = 514,}
+if (!$maxloglength) {$maxloglength = 4000;}
+if (!$conf) {$conf = "/opt/disys/etc/loglog/$host.conf";}
+if ($help) {
+  print STDERR "usage info\n";
+  print STDERR " --help  dump this info\n";
+  print STDERR " --file=config file name\n";
+  print STDERR " --maxloglength=#\n";
+  print STDERR " --server=syslogserver\n";
+  print STDERR " --port=syslogport\n";
+  print STDERR " --priority=syslog priority\n";
+  print STDERR " --facility=syslog facility\n";
+  print STDERR " --debug=#\n";
+  print STDERR "     debug flags are a bitmask, turn on the bits for the debug features you want\n";
+  print STDERR "     1 basic flow control\n";
+  print STDERR "     2 sendlog splitting of log messages\n";
+  print STDERR "     4 sendlog sending of log messages\n";
+  print STDERR "     256 File::Tail internal debugging\n";
+  exit;
+}
 $already_alive = `ps -ef | grep loglog | grep -v grep` + 0;
 if ($already_alive) {
-    # print STDERR "Already running\n";
+    if ($debug & 1) { print STDERR "Already running\n"; }
     exit;
 }
 
 $loglogname = File::Spec->rel2abs($0);
 $mytimestamp = ctime(stat($loglogname)->mtime);
-$debug=0;
 
 Proc::Daemon::Init;
 my $continue = 1;
 $SIG{TERM} = sub { $continue = 0 };
+$SIG{USR1} = sub {
+    open(DUMPFILE, ">/var/tmp/loglog.dump") or die "unable to write loglog dump file\n";
+    print DUMPFILE "already_alive\n";
+    print DUMPFILE Dumper(\$already_alive);
+    print DUMPFILE "conf\n";
+    print DUMPFILE Dumper(\$conf);
+    print DUMPFILE "continue\n";
+    print DUMPFILE Dumper(\$continue);
+    print DUMPFILE "d\n";
+    print DUMPFILE Dumper(\$d);
+    print DUMPFILE "debug\n";
+    print DUMPFILE Dumper(\$debug);
+    print DUMPFILE "Facility\n";
+    print DUMPFILE Dumper(\$Facility);
+    print DUMPFILE "facility_i\n";
+    print DUMPFILE Dumper(\$facility_i);
+    print DUMPFILE "filename\n";
+    print DUMPFILE Dumper(\$filename);
+    print DUMPFILE "files\n";
+    print DUMPFILE Dumper(\@files);
+    print DUMPFILE "host\n";
+    print DUMPFILE Dumper(\$host);
+    print DUMPFILE "interval\n";
+    print DUMPFILE Dumper(\$interval);
+    print DUMPFILE "loglogname\n";
+    print DUMPFILE Dumper(\$loglogname);
+    print DUMPFILE "maxloglength\n";
+    print DUMPFILE Dumper(\$maxloglength);
+    print DUMPFILE "message\n";
+    print DUMPFILE Dumper(\$message);
+    print DUMPFILE "messagelength\n";
+    print DUMPFILE Dumper(\$messagelength);
+    print DUMPFILE "messages\n";
+    print DUMPFILE Dumper(\@messages);
+    print DUMPFILE "month\n";
+    print DUMPFILE Dumper(\@month);
+    print DUMPFILE "msg\n";
+    print DUMPFILE Dumper(\$msg);
+    print DUMPFILE "mynewtimestamp\n";
+    print DUMPFILE Dumper(\$mynewtimestamp);
+    print DUMPFILE "mytimestamp\n";
+    print DUMPFILE Dumper(\$mytimestamp);
+    print DUMPFILE "name\n";
+    print DUMPFILE Dumper(\$name);
+    print DUMPFILE "names\n";
+    print DUMPFILE Dumper(\@names);
+    print DUMPFILE "nfound\n";
+    print DUMPFILE Dumper(\$nfound);
+    print DUMPFILE "pending\n";
+    print DUMPFILE Dumper(\@pending);
+    print DUMPFILE "pid\n";
+    print DUMPFILE Dumper(\$pid);
+    print DUMPFILE "priority\n";
+    print DUMPFILE Dumper(\$priority);
+    print DUMPFILE "priority_i\n";
+    print DUMPFILE Dumper(\$priority_i);
+    print DUMPFILE "product\n";
+    print DUMPFILE Dumper(\$product);
+    print DUMPFILE "rin\n";
+    print DUMPFILE Dumper(\$rin);
+    print DUMPFILE "sent\n";
+    print DUMPFILE Dumper(\$sent);
+    print DUMPFILE "sentbytes\n";
+    print DUMPFILE Dumper(\$sentbytes);
+    print DUMPFILE "sock\n";
+    print DUMPFILE Dumper(\$sock);
+    print DUMPFILE "syslog_facilities\n";
+    print DUMPFILE Dumper(\%syslog_facilities);
+    print DUMPFILE "SyslogHost\n";
+    print DUMPFILE Dumper(\$SyslogHost);
+    print DUMPFILE "SyslogPort\n";
+    print DUMPFILE Dumper(\$SyslogPort);
+    print DUMPFILE "syslog_priorities\n";
+    print DUMPFILE Dumper(\%syslog_priorities);
+    print DUMPFILE "t\n";
+    print DUMPFILE Dumper(\$t);
+    print DUMPFILE "thisfiletail\n";
+    print DUMPFILE Dumper(\$thisfiletail);
+    print DUMPFILE "time\n";
+    print DUMPFILE Dumper(\@time);
+    print DUMPFILE "timestamp\n";
+    print DUMPFILE Dumper(\$timestamp);
+    print DUMPFILE "ts\n";
+    print DUMPFILE Dumper(\$ts);
+    close(DUMPFILE);
+};
 
 my %syslog_priorities = (
     emerg         => 0,
@@ -75,35 +193,34 @@ my %syslog_facilities = (
 );
 
 my @month = qw{Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec};
-$SyslogHost = 'scribe';
-$Facility = 'local6';
-$priority = 'info';
-$pid        = $$,
-$SyslogPort = 514,
-$maxloglength = 4000;
-$host = `hostname -s`; chomp($host);
-$conf = "/opt/disys/etc/loglog/$host.conf";
-# print "config is $conf\n";
+$pid        = $$;
+if ($debug & 1) { print "config is $conf\n"; }
+
+#these three arrays are tied together, element X of each array correspond to each other.
+@files=();
+@names=();
+@pending=();
+@hostnames=();
 
 my $timestamp = localtime(time);
-sendlog("status","Startup (program timestamp is $mytimestamp)");
+sendlog("status",$host,"Startup (program timestamp is $mytimestamp)");
 
 if (! -e $conf) {
-   sendlog("$host loglog $timestamp Creating default logfile list");
+   sendlog("status",$host,"Creating default logfile list");
    open (C, ">$conf");
    open (I, "find -L /opt/jboss -type f -mtime -1 -name '*.log' -print | grep -v 2012 |");
    while (<I>) {
-      print C "$_ unknown";
+      print C "$_ unknown $host";
    }
    close I;
    open (I, "find -L /opt/mule -type f -mtime -1 -name '*.log' -print | grep -v 2012 |");
    while (<I>) {
-      print C "$_ unknown";
+      print C "$_ unknown $host";
    }
    close I;
    open (I, "find -L /opt/di/system/jboss -type f -mtime -1 -name '*.log' -print | grep -v 2012 |");
    while (<I>) {
-      print C "$_ unknown";
+      print C "$_ unknown $host";
    }
    close I;
    close C;
@@ -111,55 +228,75 @@ if (! -e $conf) {
 
 open (I, $conf); 
 while (<I>) {
-   chomp;
-   ($filename,$product) = split(" ",$_);
-   push(@files, [File::Tail->new(name=>"$filename",debug=>$debug),$product]);
+    chomp;
+    ($filename,$product,$sendhost) = split(" ",$_);
+    if ($product eq '') {$product = "unknown";}
+    if ($sendhost eq '') {$product = $host;}
+    push(@files, File::Tail->new(name=>"$filename",debug=>($debug &256),ignore_nonexistant=>TRUE));
+    push(@names, $product);
+    push(@hostnames, $sendhost);
 }
 close I;
 
 my $rin='';
 $interval = 5 * 60; # 5 minutes
-$sent=0; $sentbytes=0; $sentmaxlength=0; $nextreport += $interval;
-sendlog("status","finished init, configured to watch ".($#files+1)." logfiles, starting processing of logs");
+$sent=0; $sentbytes=0; $sentmaxlength=0; $nextreport = time + $interval;
+sendlog("status",$host,"finished init, configured to watch ".($#files+1)." logfiles, starting processing of logs");
 
     while ($continue) {
 	$nfound=File::Tail::select(undef,undef,undef,60,@files);
 	unless ($nfound) {
 	    my @ints;
 	    foreach(@files) {
-		push(@ints,$_[0]->interval);
+		push(@ints,$_->interval);
 	    }
 	}
-	foreach (@files) {
-            if ($_[0]->predict == 0) {
-                my $t = $_[0]->read; chomp($t);
-                my $name = $_[0]->{"input"}; 
-	        if ($t =~ /^\s/ ) {
+	for($i=0; $i<=$#files; $i++) {
+        if ($debug & 1 ){ print "$i $names[$i]\n"; }
+        if ($debug & 1 ){ print "  ".time."\n"; }
+            $thisfiletail = $files[$i];
+            $filename = $thisfiletail->{"input"};
+            $product = $names[$i];
+            if ($thisfiletail->predict == 0) {
+                my $t = $thisfiletail->read; chomp($t);
+                if ($debug & 1 ){ print "  $t\n";}
+                my $name = $thisfiletail->{"input"}; 
+	        if ($t =~ /^\s/ || length($pending[$i]) > 65535) {
 	            # the line starts with whitespace, assume it's a continuation of the prior line
 		    #   append it to the prior line, include a separator to indicate that we have done so
-		    $_[0]->pending .= " #015 ".$t;
+                    # if the line is longer than 64K, send what we have anyway.
+		    $pending[$i] .= " #015 ".$t;
                 } else {
 	            # if there is a prior line send it
-		    if ($_[0]->pending ne "") {
-		        $filename = $_[0]->{"input"};
-		        $product = $_[1] || "unknown";
-		        sendlog($product, $_[0]->pending);
+		    if ($pending[$i] ne "") {
+		        sendlog($product,$hostnames[$i], $filename.': '.$pending[$i]);
                         $sent++;
-		        $sentbytes += length($t);
-		        if (lenth($t) > $sentmaxlength) { $sentmaxlength = length($t); }
+		        $sentbytes += length($pending[$i]);
+		        if (length($pending[$i]) > $sentmaxlength) { $sentmaxlength = length($pending[$i]); }
 		    }
 		    # replace the prior buffer (if any) with the new data
-		    $_[0]->pending =$t;
+		    $pending[$i] =$t;
 	        }
+	    } elsif ($pending[$i] ne "") {
+                # if there is no new information, send anything that's pending anyway.
+                # without this the last line of a log will never get sent.
+                # With this it waits one timeout, then gets sent.
+
+	        sendlog($product,$hostnames[$i], $filename.': '.$pending[$i]);
+                $sent++;
+	        $sentbytes += length($pending[$i]);
+		if (length($pending[$i]) > $sentmaxlength) { $sentmaxlength = length($pending[$i]); }
+	        $pending[$i] ='';
 	    }
+
 	}
         if (time > $nextreport) { 
-           sendlog("$host loglog-status sent lines=$sent bytes=$sentbytes maxlength=$sentmaxlength");
+           sendlog("status",$host,"sent lines=$sent bytes=$sentbytes maxlength=$sentmaxlength");
            $sent=0; $sentbytes=0; $sentmaxlength=0; $nextreport += $interval;
         }
         $mynewtimestamp = ctime(stat($loglogname)->mtime);
         if ($mynewtimestamp ne $mytimestamp) { # Modified! die, and watchdog will restart
-           sendlog("status", "program updated, aborting");
+           sendlog("status", $host,"program updated, aborting");
            exit;
         }
     }
@@ -170,8 +307,10 @@ sub sendlog {
         PeerPort => $SyslogPort,
         Proto    => 'udp'
     ) or die "Socket could not be created : $!\n";
-    my $name   = shift;
-    my $msg   = shift;
+    my $product   = shift;
+    my $sendhost  = shift;
+    my $msg   = shift || "NO MESSAGE";
+    if ($debug &1) {print "sending log for $product $msg\n";}
 
     my $facility_i = $syslog_facilities{ $Facility } || 21;
     my $priority_i = $syslog_priorities{ $Priority } || 7;
@@ -188,19 +327,43 @@ sub sendlog {
 
     while (length($msg) > $maxloglength) {
         $messagelength = rindex $msg, " ", $maxloglength ; #find the position of the last space before position $maxloglenth
+        $offset=1;
+        if ($messagelength == -1) {
+            if ($debug &2) {print "trying splitting on tab\n";}
+            $messagelength = rindex $msg, "\t", $maxloglength ; #find the position of the last tab before position $maxloglenth
+            $offset=1;
+        }
+        if ($messagelength == -1) {
+            if ($debug &2) {print "trying splitting on #015\n";}
+            $messagelength = rindex $msg, "#015", $maxloglength ; #find the position of the last escaped newline before position $maxloglenth
+            $offset=4;
+        }
+        if ($messagelength == -1) {
+            if ($debug &2) {print "giving up splitting at $maxloglength\n";}
+            $messagelength = $maxloglength; #if all else fails, just trim the log at the max size, no matter where in the message it is.
+            $offset=0;
+        }
         push @messages, substr($msg, 0, $messagelength);
-        $msg = substr($msg, $messagelength); # skip the space
+        if ($debug &2) {print "splitting message ",($messagelength+1)," offset $offset, ",($#messages+1)," part, last part: $messages[-1]\n";}
+        $msg = substr($msg, $messagelength +$offset); # skip the thing we are splitting on
     }
+    if ($debug &2) {print "message $msg\n";}
     push @messages, $msg;
-    if ($#messages = 1) {
-	$message = "<$d>$ts $host loglog-${name}[$pid]: $messages[0]";
+    if ($debug & 4) {print $#messages, " parts in this message\n";}
+    if ($#messages == 0) {
+	$message = "<$d>$ts $sendhost loglog-${product}[$pid]: $messages[0]";
+        if ($debug &4) {print  "sending single",$message,"\n";}
         print $sock $message;
     } else {
-        for ($i=0; $i<$#message; $i++){
-            $message = "<$d>$ts $host loglog-${name}[$pid]: ($i/$#messages): $messages[$i]";
+        if ($debug &4) {print "multipart message $j $#messages\n";}
+        for ($j=0; $j<=$#messages; $j++){
+            $message = "<$d>$ts $sendhost loglog-${product}[$pid]: (".($j+1).'/'.($#messages+1)."): $messages[$j]";
+            if ($debug &4) {print  "sending multipart $j ",$message,"\n";}
             print $sock $message;
         }
+        if ($debug &4) {print "finished multipart message\n";}
     }
+    @messages=();
     $sock->close();
 }
 
@@ -244,13 +407,7 @@ sub interval {
 sub logit {
     my $object=shift;
     my @call=caller(1);
-    print # STDERR 
-#	time()." ".
-	"\033[7m".
-	    $call[3]." ".$object->{"input"}." ".join("",@_).
-		"\033[0m".
-		    "\n"
-	if $object->debug;
+    print  STDERR time()." ".  "\033[7m".  $call[3]." ".$object->{"input"}." ".join("",@_).  "\033[0m".  "\n" if $object->debug;
 }
 
 sub adjustafter {
